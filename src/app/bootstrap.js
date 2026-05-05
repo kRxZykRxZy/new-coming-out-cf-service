@@ -1,7 +1,7 @@
-import express from 'express';
-import cors from 'cors';
-import loginRoutes from '../routes/auth/login.js';
-import signupRoutes from '../routes/auth/signup.js';
+const express = require('express');
+const cors = require('cors');
+const loginRoutes = require('../routes/auth/login.js');
+const signupRoutes = require('../routes/auth/signup.js');
 
 const app = express();
 app.use(cors());
@@ -10,4 +10,4 @@ app.use(express.json());
 app.use('/api/auth', loginRoutes);
 app.use('/api/auth', signupRoutes);
 
-export default app;
+module.exports = app;

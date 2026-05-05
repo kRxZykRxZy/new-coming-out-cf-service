@@ -1,6 +1,6 @@
-import crypto from 'crypto';
+const crypto = require('crypto');
 
-export default async function createSessionToken() {
+async function createSessionToken() {
     return new Promise((resolve, reject) => {
         crypto.randomBytes(48, (err, buffer) => {
             if (err) {
@@ -11,3 +11,5 @@ export default async function createSessionToken() {
         });
     });
 }
+
+module.exports = createSessionToken;

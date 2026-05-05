@@ -1,4 +1,4 @@
-import express from 'express';
+const express = require('express');
 const router = express.Router();
 
 const createUser = require('../../../models/auth/users/createUser');
@@ -14,4 +14,4 @@ router.post('/signup', async (req, res) => {
     }
 });
 
-export default router;
+module.exports = router;

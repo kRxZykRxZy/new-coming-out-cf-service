@@ -1,4 +1,4 @@
-import app from './src/app/bootstrap.js';
+const app = require('./src/app/bootstrap.js');
 
 const PORT = process.env.PORT || 3000;
 
