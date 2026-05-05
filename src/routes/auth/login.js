@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const loginUser = require('../../../models/auth/users/loginUser');
-const createUserSession = require('../../models/auth/sessions/createUserSession');
+const createUserSession = require('../../../models/auth/sessions/createUserSession');
 const createSessionToken = require('../../utils/sessions/createSessionToken');
 
 router.post('/login', async (req, res) => {

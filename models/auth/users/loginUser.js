@@ -1,6 +1,6 @@
 "use strict";
 
-const { User } = require('../db/models');
+const { User } = require('../../db/models');
 
 async function loginUser(email, password) {
     try {

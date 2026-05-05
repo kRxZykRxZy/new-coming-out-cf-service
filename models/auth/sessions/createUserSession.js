@@ -1,6 +1,6 @@
 "use strict";
 
-const { Session } = require('../db/models');
+const { Session } = require('../../db/models');
 
 async function createUserSession(userId, sessionToken, ip) {
     try {
