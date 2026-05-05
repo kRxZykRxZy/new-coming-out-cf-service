@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 
-const loginUser = require('../../models/auth/users/loginUser');
+const loginUser = require('../../../models/auth/users/loginUser');
 const createUserSession = require('../../models/auth/sessions/createUserSession');
 const createSessionToken = require('../../utils/sessions/createSessionToken');
 
