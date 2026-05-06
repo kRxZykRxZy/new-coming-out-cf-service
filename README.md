@@ -1,6 +1,6 @@
-# New Coming Out CF Service
+# CloudCast MVP
 
-This project uses Sequelize ORM with support for PostgreSQL and SQLite databases.
+CloudCast is an MVP platform for exposing local services via secure tunnels.
 
 ## Setup
 
@@ -10,8 +10,10 @@ This project uses Sequelize ORM with support for PostgreSQL and SQLite databases
    ```
 
 2. Set environment variables:
-   - For SQLite (default): Set `DB_TYPE=sqlite` and optionally `DB_PATH=./database.sqlite`
-   - For PostgreSQL: Set `DB_TYPE=postgres` and `DATABASE_URL=postgresql://user:password@host:port/database`
+    - For SQLite (default): Set `DB_TYPE=sqlite` and optionally `DB_PATH=./database.sqlite`
+    - For PostgreSQL: Set `DB_TYPE=postgres` and `DATABASE_URL=postgresql://user:password@host:port/database`
+    - For tunnel routing: set `BASE_DOMAIN=cloudcast.dev`
+    - For web app CORS: set `CORS_ORIGIN=http://localhost:5173`
 
 3. Run migrations:
    ```bash
@@ -20,25 +22,38 @@ This project uses Sequelize ORM with support for PostgreSQL and SQLite databases
 
 ## Usage
 
-Import the sequelize instance from `models/db/config.js` in your models.
+Start the API server:
+```bash
+npm start
+```
 
-Example model:
-```javascript
-const { DataTypes } = require('sequelize');
-const sequelize = require('./db/config');
+### Web app
 
-const Random = sequelize.define('Random', {
-  name: {
-    type: DataTypes.STRING,
-    allowNull: false
-  },
-  value: {
-    type: DataTypes.INTEGER,
-    allowNull: true
-  }
-});
+The React + Tailwind web app lives in `web/`.
 
-module.exports = Random;
+```bash
+cd web
+npm install
+npm run dev
+```
+
+Create a `.env` in `web/` if you need to override the API URL:
+```
+VITE_API_URL=http://localhost:8000
+```
+
+### CLI
+
+The Deno CLI lives in `cli/`.
+
+```bash
+deno run --allow-net --allow-read --allow-write --allow-env cli/main.ts login
+```
+
+Optional CLI environment variables:
+```
+CLOUDCAST_API_URL=http://localhost:8000
+CLOUDCAST_APP_URL=http://localhost:5173
 ```
 
 ## Troubleshooting

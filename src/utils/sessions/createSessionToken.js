@@ -1,15 +1,7 @@
-const crypto = require('crypto');
+const createToken = require('../tokens/createToken');
 
 async function createSessionToken() {
-    return new Promise((resolve, reject) => {
-        crypto.randomBytes(48, (err, buffer) => {
-            if (err) {
-                reject(err);
-            } else {
-                resolve(buffer.toString('hex'));
-            }
-        });
-    });
+    return createToken(48);
 }
 
 module.exports = createSessionToken;

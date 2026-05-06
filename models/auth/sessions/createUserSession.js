@@ -2,12 +2,13 @@
 
 const { Session } = require('../../db/models');
 
-async function createUserSession(userId, sessionToken, ip) {
+async function createUserSession(userId, sessionTokenHash, ip, expiresAt) {
     try {
         const newSession = await Session.create({
             userId: userId,
-            sessionToken: sessionToken,
-            ip: ip
+            sessionTokenHash: sessionTokenHash,
+            ip: ip,
+            expiresAt: expiresAt
         });
         return newSession;
     } catch (error) {
