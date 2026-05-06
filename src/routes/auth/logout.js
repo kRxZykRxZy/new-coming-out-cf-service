@@ -11,6 +11,7 @@ router.post('/logout', async (req, res) => {
     try {
         await deleteUserSession(sessionToken);
         res.clearCookie('sessionToken', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'Lax' });
+        res.clearCookie('csrfToken', { httpOnly: false, secure: process.env.NODE_ENV === 'production', sameSite: 'Lax' });
         res.status(200).json({ message: 'Logout successful' });
     } catch (error) {
         res.status(500).json({ message: 'Error logging out' });

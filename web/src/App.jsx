@@ -3,11 +3,20 @@ import { BrowserRouter, Link, Route, Routes, useLocation, useNavigate } from 're
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+function getCookie(name) {
+  return document.cookie
+    .split('; ')
+    .find((row) => row.startsWith(`${name}=`))
+    ?.split('=')[1];
+}
+
 async function apiFetch(path, options = {}) {
+  const csrfToken = getCookie('csrfToken');
   const response = await fetch(`${API_BASE}${path}`, {
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
+      ...(csrfToken ? { 'X-CSRF-Token': decodeURIComponent(csrfToken) } : {}),
       ...(options.headers || {})
     },
     ...options

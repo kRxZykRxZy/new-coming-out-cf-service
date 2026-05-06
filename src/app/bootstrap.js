@@ -26,6 +26,11 @@ app.use((req, res, next) => {
     if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
         return next();
     }
+    const csrfToken = req.cookies.csrfToken;
+    const headerToken = req.headers['x-csrf-token'];
+    if (!csrfToken || !headerToken || csrfToken !== headerToken) {
+        return res.status(403).json({ message: 'Invalid CSRF token' });
+    }
     const origin = req.headers.origin;
     if (origin && allowedOrigins.includes(origin)) {
         return next();
