@@ -12,11 +12,37 @@ const cliAuthRoutes = require('../routes/cli/auth.js');
 
 const app = express();
 const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
+const allowedOrigins = corsOrigin.split(',').map((origin) => origin.trim()).filter(Boolean);
 
 app.set('trust proxy', 1);
 app.use(cors({ origin: corsOrigin, credentials: true }));
 app.use(express.json({ limit: '2mb' }));
 app.use(cookieParser());
+
+app.use((req, res, next) => {
+    if (!req.cookies.sessionToken) {
+        return next();
+    }
+    if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+        return next();
+    }
+    const origin = req.headers.origin;
+    if (origin && allowedOrigins.includes(origin)) {
+        return next();
+    }
+    const referer = req.headers.referer;
+    if (referer) {
+        try {
+            const refererOrigin = new URL(referer).origin;
+            if (allowedOrigins.includes(refererOrigin)) {
+                return next();
+            }
+        } catch (error) {
+            return res.status(403).json({ message: 'Invalid request origin' });
+        }
+    }
+    return res.status(403).json({ message: 'Invalid request origin' });
+});
 
 app.get('/api/health', (req, res) => {
     res.status(200).json({ status: 'ok' });

@@ -205,7 +205,15 @@ async function startTunnel(cloudcastId?: string) {
       if (message.type !== 'request') {
         return;
       }
-      const target = new URL(message.path, cloudcast.targetUrl);
+      const baseTarget = new URL(cloudcast.targetUrl);
+      if (!['http:', 'https:'].includes(baseTarget.protocol)) {
+        throw new Error('Unsupported target protocol.');
+      }
+      const requestPath = typeof message.path === 'string' ? message.path : '/';
+      if (!requestPath.startsWith('/')) {
+        throw new Error('Invalid request path.');
+      }
+      const target = new URL(requestPath, baseTarget);
       const bodyBytes = message.body ? fromBase64(message.body) : undefined;
       const headers = { ...(message.headers ?? {}) } as Record<string, string>;
       delete headers.host;
@@ -216,12 +224,12 @@ async function startTunnel(cloudcastId?: string) {
         body: bodyBytes
       });
       const responseBuffer = new Uint8Array(await response.arrayBuffer());
-      const headers = Object.fromEntries(response.headers.entries());
+      const responseHeaders = Object.fromEntries(response.headers.entries());
       socket.send(JSON.stringify({
         type: 'response',
         id: message.id,
         status: response.status,
-        headers,
+        headers: responseHeaders,
         body: responseBuffer.length ? toBase64(responseBuffer) : null
       }));
     } catch (error) {

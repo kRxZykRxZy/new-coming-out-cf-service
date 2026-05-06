@@ -14,6 +14,7 @@ CloudCast is an MVP platform for exposing local services via secure tunnels.
     - For PostgreSQL: Set `DB_TYPE=postgres` and `DATABASE_URL=postgresql://user:password@host:port/database`
     - For tunnel routing: set `BASE_DOMAIN=cloudcast.dev`
     - For web app CORS: set `CORS_ORIGIN=http://localhost:5173`
+    - For token hashing: set `TOKEN_SECRET` to a strong secret
 
 3. Run migrations:
    ```bash
