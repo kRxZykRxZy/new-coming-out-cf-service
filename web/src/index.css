@@ -11,7 +11,13 @@
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100;
   margin: 0;
   font-family: 'Inter', system-ui, sans-serif;
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+html.dark body {
+  background-color: #020617;
+  color: #f8fafc;
 }

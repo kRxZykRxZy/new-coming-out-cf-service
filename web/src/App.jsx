@@ -401,7 +401,7 @@ function AppShell() {
     try {
       const data = await apiFetch('/api/auth/session');
       setUser(data.user || null);
-    } catch (error) {
+    } catch {
       setUser(null);
     }
   };
