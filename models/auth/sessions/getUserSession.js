@@ -1,12 +1,20 @@
 "use strict";
 
-const { Session } = require('../../db/models');
+const { Session, User } = require('../../db/models');
+const hashToken = require('../../../src/utils/tokens/hashToken');
 
 async function getUserSession(sessionToken) {
     try {
-        const session = await Session.findOne({ where: { sessionToken: sessionToken } });
+        const sessionTokenHash = hashToken(sessionToken);
+        const session = await Session.findOne({
+            where: { sessionTokenHash: sessionTokenHash },
+            include: [{ model: User }]
+        });
         if (!session) {
             throw new Error('Session not found');
+        }
+        if (session.expiresAt && session.expiresAt < new Date()) {
+            throw new Error('Session expired');
         }
         return session;
     } catch (error) {

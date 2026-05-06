@@ -1,0 +1,7 @@
+{
+  "name": "cloudcast",
+  "version": "0.1.0",
+  "tasks": {
+    "start": "deno run --allow-net --allow-read --allow-write --allow-env cli/main.ts"
+  }
+}

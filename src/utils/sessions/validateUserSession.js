@@ -7,7 +7,8 @@ async function validateUserSession(req, res, next) {
     }
     try {
         const session = await getUserSession(sessionToken);
-        req.session = session; // Attach session to request object
+        req.session = session;
+        req.user = session.User;
         next();
     } catch (error) {
         res.status(401).json({ message: 'Invalid session token' });
