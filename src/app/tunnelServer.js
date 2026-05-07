@@ -10,7 +10,7 @@ const createToken = require('../utils/tokens/createToken');
 
 const REQUEST_TIMEOUT_MS = 30000;
 const BASE_DOMAIN = process.env.BASE_DOMAIN || 'cloudcast.dev';
-const CACHE_DIR = process.env.CLOUDCAST_CACHE_DIR || path.join(process.cwd(), '.cloudcast-cache');
+const CACHE_DIR = process.env.CLOUDCAST_CACHE_DIR || path.resolve(__dirname, '..', '..', '.cloudcast-cache');
 const CACHE_KEY_HEADERS = ['accept', 'accept-language', 'accept-encoding'];
 
 function normalizeHeaders(rawHeaders) {
@@ -148,7 +148,7 @@ async function readCacheEntry(key) {
     try {
         const raw = await fs.readFile(getCachePath(key), 'utf8');
         const entry = JSON.parse(raw);
-        if (Date.now() >= entry.expiresAt) {
+        if (Date.now() > entry.expiresAt) {
             try {
                 await fs.unlink(getCachePath(key));
             } catch {
