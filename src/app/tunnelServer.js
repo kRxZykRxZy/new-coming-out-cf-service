@@ -1,12 +1,188 @@
 "use strict";
 
 const { WebSocketServer } = require('ws');
+const crypto = require('crypto');
+const fs = require('fs/promises');
+const path = require('path');
 const { Cloudcast, ApiToken } = require('../../models/db/models');
 const hashToken = require('../utils/tokens/hashToken');
 const createToken = require('../utils/tokens/createToken');
 
 const REQUEST_TIMEOUT_MS = 30000;
 const BASE_DOMAIN = process.env.BASE_DOMAIN || 'cloudcast.dev';
+const CACHE_DIR = process.env.CLOUDCAST_CACHE_DIR || path.join(process.cwd(), '.cloudcast-cache');
+const CACHE_VARY_HEADERS = ['accept', 'accept-language', 'accept-encoding'];
+
+function normalizeHeaders(rawHeaders) {
+    const normalized = {};
+    if (!rawHeaders) {
+        return normalized;
+    }
+    Object.entries(rawHeaders).forEach(([key, value]) => {
+        if (value === undefined) {
+            return;
+        }
+        const normalizedValue = Array.isArray(value) ? value.join(', ') : value;
+        normalized[key.toLowerCase()] = normalizedValue;
+    });
+    return normalized;
+}
+
+function parseCacheControl(value) {
+    const directives = {};
+    if (!value) {
+        return directives;
+    }
+    value.split(',').forEach((part) => {
+        const [rawKey, ...rest] = part.trim().split('=');
+        const key = rawKey.trim().toLowerCase();
+        if (!key) {
+            return;
+        }
+        if (rest.length === 0) {
+            directives[key] = true;
+            return;
+        }
+        directives[key] = rest.join('=').replace(/^"|"$/g, '');
+    });
+    return directives;
+}
+
+function getCacheMaxAgeSeconds(headers) {
+    const cacheControl = headers['cache-control'];
+    if (!cacheControl) {
+        return null;
+    }
+    const directives = parseCacheControl(cacheControl);
+    if (directives['no-store'] || directives['no-cache'] || directives.private) {
+        return null;
+    }
+    const maxAgeValue = directives['s-maxage'] ?? directives['max-age'];
+    if (typeof maxAgeValue === 'string') {
+        const parsed = Number(maxAgeValue);
+        if (Number.isFinite(parsed) && parsed > 0) {
+            return parsed;
+        }
+        if (Number.isFinite(parsed) && parsed <= 0) {
+            return null;
+        }
+    }
+    const expiresHeader = headers.expires;
+    if (expiresHeader) {
+        const expiresAt = Date.parse(expiresHeader);
+        if (!Number.isNaN(expiresAt)) {
+            const diffSeconds = Math.floor((expiresAt - Date.now()) / 1000);
+            if (diffSeconds > 0) {
+                return diffSeconds;
+            }
+        }
+    }
+    return null;
+}
+
+function shouldBypassCache(requestHeaders) {
+    const cacheControl = parseCacheControl(requestHeaders['cache-control']);
+    if (cacheControl['no-store'] || cacheControl['no-cache']) {
+        return true;
+    }
+    const maxAgeValue = cacheControl['max-age'];
+    if (typeof maxAgeValue === 'string') {
+        const parsed = Number(maxAgeValue);
+        if (Number.isFinite(parsed) && parsed <= 0) {
+            return true;
+        }
+    }
+    const pragma = requestHeaders.pragma?.toLowerCase();
+    if (pragma === 'no-cache') {
+        return true;
+    }
+    return false;
+}
+
+function isCacheableRequest(method, headers) {
+    if (!['GET', 'HEAD'].includes(String(method).toUpperCase())) {
+        return false;
+    }
+    if (headers.authorization || headers.cookie) {
+        return false;
+    }
+    if (shouldBypassCache(headers)) {
+        return false;
+    }
+    return true;
+}
+
+function isCacheableResponse(status, headers, cacheSeconds) {
+    if (!cacheSeconds) {
+        return false;
+    }
+    if (status < 200 || status >= 300) {
+        return false;
+    }
+    if (headers['set-cookie']) {
+        return false;
+    }
+    return true;
+}
+
+function createCacheKey({ method, url, headers }) {
+    const varyHeaders = {};
+    CACHE_VARY_HEADERS.forEach((header) => {
+        if (headers[header]) {
+            varyHeaders[header] = headers[header];
+        }
+    });
+    const keyData = JSON.stringify({
+        method: String(method).toUpperCase(),
+        url,
+        headers: varyHeaders
+    });
+    return crypto.createHash('sha256').update(keyData).digest('hex');
+}
+
+function getCachePath(key) {
+    return path.join(CACHE_DIR, `${key}.json`);
+}
+
+async function readCacheEntry(key) {
+    try {
+        const raw = await fs.readFile(getCachePath(key), 'utf8');
+        const entry = JSON.parse(raw);
+        if (Date.now() >= entry.expiresAt) {
+            try {
+                await fs.unlink(getCachePath(key));
+            } catch {
+                // ignore cleanup errors
+            }
+            return null;
+        }
+        return entry;
+    } catch {
+        return null;
+    }
+}
+
+async function writeCacheEntry(key, entry) {
+    try {
+        await fs.mkdir(CACHE_DIR, { recursive: true });
+        await fs.writeFile(getCachePath(key), JSON.stringify(entry));
+    } catch {
+        // ignore cache write errors
+    }
+}
+
+function sendCachedResponse(res, entry) {
+    const ageSeconds = Math.max(0, Math.floor((Date.now() - entry.storedAt) / 1000));
+    const headers = { ...entry.headers, age: String(ageSeconds) };
+    Object.entries(headers).forEach(([key, value]) => {
+        if (key.toLowerCase() === 'transfer-encoding') {
+            return;
+        }
+        res.setHeader(key, value);
+    });
+    const bodyBuffer = entry.body ? Buffer.from(entry.body, 'base64') : Buffer.alloc(0);
+    res.status(entry.status || 200).send(bodyBuffer);
+}
 
 function createTunnelServer(server) {
     const connections = new Map();
@@ -73,14 +249,31 @@ function createTunnelServer(server) {
             pendingRequests.delete(message.id);
             clearTimeout(pending.timeout);
             const bodyBuffer = message.body ? Buffer.from(message.body, 'base64') : Buffer.alloc(0);
-            const headers = message.headers || {};
+            const headers = normalizeHeaders(message.headers || {});
             Object.entries(headers).forEach(([key, value]) => {
                 if (key.toLowerCase() === 'transfer-encoding') {
                     return;
                 }
                 pending.res.setHeader(key, value);
             });
-            pending.res.status(message.status || 200).send(bodyBuffer);
+            const statusCode = message.status || 200;
+            if (pending.cacheAllowed && pending.cacheKey) {
+                const cacheSeconds = getCacheMaxAgeSeconds(headers);
+                if (isCacheableResponse(statusCode, headers, cacheSeconds)) {
+                    const now = Date.now();
+                    const bodyBase64 = typeof message.body === 'string'
+                        ? message.body
+                        : (bodyBuffer.length ? bodyBuffer.toString('base64') : null);
+                    await writeCacheEntry(pending.cacheKey, {
+                        status: statusCode,
+                        headers,
+                        body: bodyBase64,
+                        storedAt: now,
+                        expiresAt: now + cacheSeconds * 1000
+                    });
+                }
+            }
+            pending.res.status(statusCode).send(bodyBuffer);
         }
     }
 
@@ -103,6 +296,19 @@ function createTunnelServer(server) {
             res.status(404).json({ message: 'Cloudcast not found' });
             return true;
         }
+        const requestHeaders = normalizeHeaders(req.headers);
+        const requestMethod = req.method || 'GET';
+        const host = req.headers.host || 'localhost';
+        const requestUrl = `${req.protocol}://${host}${req.originalUrl}`;
+        const cacheAllowed = isCacheableRequest(requestMethod, requestHeaders);
+        const cacheKey = cacheAllowed ? createCacheKey({ method: requestMethod, url: requestUrl, headers: requestHeaders }) : null;
+        if (cacheAllowed && cacheKey) {
+            const cachedEntry = await readCacheEntry(cacheKey);
+            if (cachedEntry) {
+                sendCachedResponse(res, cachedEntry);
+                return true;
+            }
+        }
         const connection = connections.get(String(cloudcast.id));
         if (!connection) {
             res.status(502).json({ message: 'Cloudcast is offline' });
@@ -123,7 +329,7 @@ function createTunnelServer(server) {
             pendingRequests.delete(requestId);
             res.status(504).json({ message: 'Cloudcast timed out' });
         }, REQUEST_TIMEOUT_MS);
-        pendingRequests.set(requestId, { res, timeout });
+        pendingRequests.set(requestId, { res, timeout, cacheAllowed, cacheKey });
         return true;
     }
 

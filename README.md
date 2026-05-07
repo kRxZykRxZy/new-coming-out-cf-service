@@ -13,6 +13,7 @@ CloudCast is an MVP platform for exposing local services via secure tunnels.
     - For SQLite (default): Set `DB_TYPE=sqlite` and optionally `DB_PATH=./database.sqlite`
     - For PostgreSQL: Set `DB_TYPE=postgres` and `DATABASE_URL=postgresql://user:password@host:port/database`
     - For tunnel routing: set `BASE_DOMAIN=cloudcast.dev`
+    - For tunnel disk caching: set `CLOUDCAST_CACHE_DIR=/path/to/cache`
     - For web app CORS: set `CORS_ORIGIN=http://localhost:5173`
     - For token hashing: set `TOKEN_SECRET` to a strong secret
 
@@ -55,10 +56,9 @@ Optional CLI environment variables:
 ```
 CLOUDCAST_API_URL=http://localhost:8000
 CLOUDCAST_APP_URL=http://localhost:5173
-CLOUDCAST_CACHE_DIR=/path/to/cache
 ```
 
-The CLI caches tunnel responses on disk when the upstream sends Cache-Control max-age (or Expires) headers.
+Tunnel responses are cached on the server when upstream Cache-Control max-age (or Expires) headers are present.
 
 ## Troubleshooting
 
