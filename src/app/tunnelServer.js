@@ -54,7 +54,7 @@ function getCacheMaxAgeSeconds(headers) {
         return null;
     }
     const directives = parseCacheControl(cacheControl);
-    if (directives['no-store'] || directives['no-cache'] || directives.private) {
+    if (directives['no-store'] || directives['no-cache'] || directives['private']) {
         return null;
     }
     const maxAgeValue = directives['s-maxage'] ?? directives['max-age'];

@@ -48,6 +48,12 @@ export async function startTunnel(cloudcastId?: string) {
       if (!requestPath.startsWith('/') || requestPath.startsWith('//')) {
         throw new Error('Invalid request path.');
       }
+      if (requestPath.includes('\0') || /%00/i.test(requestPath)) {
+        throw new Error('Invalid request path.');
+      }
+      if (/%2f|%5c/i.test(requestPath)) {
+        throw new Error('Invalid request path.');
+      }
       const rawPath = requestPath.split('?')[0];
       if (rawPath.split('/').some((segment) => segment === '..')) {
         throw new Error('Invalid request path.');
