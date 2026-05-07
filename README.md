@@ -55,7 +55,10 @@ Optional CLI environment variables:
 ```
 CLOUDCAST_API_URL=http://localhost:8000
 CLOUDCAST_APP_URL=http://localhost:5173
+CLOUDCAST_CACHE_DIR=/path/to/cache
 ```
+
+The CLI caches tunnel responses on disk when the upstream sends Cache-Control max-age (or Expires) headers.
 
 ## Troubleshooting
 
