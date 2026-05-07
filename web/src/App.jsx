@@ -1,7 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BrowserRouter, Link, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const BASELINE_HOURLY_TRAFFIC_PERCENTAGES = [22, 35, 45, 30, 58, 67, 44, 62, 71, 63, 54, 78];
+const TRAFFIC_BOOST_MULTIPLIER = 2;
+const MAX_TRAFFIC_BOOST = 18;
+const MAX_TRAFFIC_VISUAL_PERCENTAGE = 92;
 
 function getCookie(name) {
   return document.cookie
@@ -28,9 +32,18 @@ async function apiFetch(path, options = {}) {
   return response.json().catch(() => ({}));
 }
 
-function Icon({ path, className = 'h-5 w-5', viewBox = '0 0 24 24' }) {
+function Icon({ path, className = 'h-5 w-5', viewBox = '0 0 24 24', label }) {
   return (
-    <svg viewBox={viewBox} className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      viewBox={viewBox}
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...(label ? { role: 'img', 'aria-label': label } : { 'aria-hidden': true })}
+    >
       {path}
     </svg>
   );
@@ -75,7 +88,14 @@ function SidebarLink({ to, label, icon }) {
 
 function Layout({ children, onLogout, user }) {
   const location = useLocation();
-  const inDashboard = location.pathname === '/dashboard';
+  const pageTitles = {
+    '/': 'Secure Edge Operations',
+    '/dashboard': 'Tunnels & Analytics Workspace',
+    '/login': 'Secure Edge Operations',
+    '/register': 'Secure Edge Operations',
+    '/cli-auth': 'Secure Edge Operations'
+  };
+  const pageTitle = pageTitles[location.pathname] || 'Secure Edge Operations';
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-100 via-sky-50 to-white text-slate-800">
@@ -91,8 +111,7 @@ function Layout({ children, onLogout, user }) {
 
           <nav className="space-y-1">
             <SidebarLink to="/" label="Overview" icon={icons.dashboard} />
-            <SidebarLink to="/dashboard" label="Tunnels" icon={icons.tunnel} />
-            <SidebarLink to="/dashboard" label="Analytics" icon={icons.analytics} />
+            <SidebarLink to="/dashboard" label="Tunnels & Analytics" icon={icons.tunnel} />
             <SidebarLink to="/cli-auth" label="CLI Access" icon={icons.key} />
           </nav>
 
@@ -109,7 +128,7 @@ function Layout({ children, onLogout, user }) {
           <header className="mb-6 flex flex-col gap-4 rounded-2xl border border-sky-100 bg-white px-4 py-4 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-600">CloudCast Dashboard</p>
-              <h1 className="mt-1 text-2xl font-semibold text-slate-900">{inDashboard ? 'Tunnel & Analytics Workspace' : 'Secure Edge Operations'}</h1>
+              <h1 className="mt-1 text-2xl font-semibold text-slate-900">{pageTitle}</h1>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {user ? (
@@ -304,10 +323,10 @@ function DashboardPage({ user }) {
   const [form, setForm] = useState({ targetUrl: '', subdomain: '', domainId: '' });
   const [error, setError] = useState('');
 
-  const refreshCloudcasts = async () => {
+  const refreshCloudcasts = useCallback(async () => {
     const data = await apiFetch('/api/cloudcasts');
     setCloudcasts(data.cloudcasts || []);
-  };
+  }, []);
 
   useEffect(() => {
     if (!user) {
@@ -320,7 +339,7 @@ function DashboardPage({ user }) {
       .catch(() => null);
 
     refreshCloudcasts().catch(() => null);
-  }, [navigate, user]);
+  }, [navigate, refreshCloudcasts, user]);
 
   const stats = useMemo(() => {
     const total = cloudcasts.length;
@@ -331,11 +350,10 @@ function DashboardPage({ user }) {
   }, [cloudcasts]);
 
   const analyticsBars = useMemo(() => {
-    const base = [22, 35, 45, 30, 58, 67, 44, 62, 71, 63, 54, 78];
-    const lift = Math.min(cloudcasts.length * 2, 18);
-    return base.map((value, index) => ({
+    const trafficBoost = Math.min(cloudcasts.length * TRAFFIC_BOOST_MULTIPLIER, MAX_TRAFFIC_BOOST);
+    return BASELINE_HOURLY_TRAFFIC_PERCENTAGES.map((value, index) => ({
       hour: `${index * 2}:00`,
-      value: Math.min(92, value + lift)
+      value: Math.min(MAX_TRAFFIC_VISUAL_PERCENTAGE, value + trafficBoost)
     }));
   }, [cloudcasts.length]);
 
@@ -377,16 +395,19 @@ function DashboardPage({ user }) {
           <span className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700">Last 24h</span>
         </div>
 
-        <div className="grid grid-cols-12 items-end gap-2 rounded-xl border border-sky-100 bg-sky-50/60 p-4">
-          {analyticsBars.map((item) => (
-            <div key={item.hour} className="flex flex-col items-center gap-2">
-              <div className="h-32 w-3 rounded-full bg-sky-100">
-                <div className="w-full rounded-full bg-gradient-to-t from-sky-500 to-sky-300" style={{ height: `${item.value}%`, marginTop: `${100 - item.value}%` }} />
+        <figure className="rounded-xl border border-sky-100 bg-sky-50/60 p-4">
+          <figcaption className="sr-only">Traffic chart for the last 24 hours in 2-hour intervals.</figcaption>
+          <div className="grid grid-cols-12 items-end gap-2">
+            {analyticsBars.map((item) => (
+              <div key={item.hour} className="flex flex-col items-center gap-2">
+                <div className="h-32 w-3 rounded-full bg-sky-100">
+                  <div className="w-full rounded-full bg-gradient-to-t from-sky-500 to-sky-300" style={{ height: `${item.value}%`, marginTop: `${100 - item.value}%` }} />
+                </div>
+                <span className="text-[10px] font-medium text-slate-500">{item.hour}</span>
               </div>
-              <span className="text-[10px] font-medium text-slate-500">{item.hour}</span>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </figure>
       </section>
 
       <section className="rounded-2xl border border-sky-100 bg-white p-5 shadow-sm">
@@ -399,38 +420,50 @@ function DashboardPage({ user }) {
         </div>
 
         <div className="overflow-hidden rounded-xl border border-sky-100">
-          <div className="hidden grid-cols-[2fr_2fr_1fr] gap-3 bg-sky-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 md:grid">
-            <p>Public URL</p>
-            <p>Target</p>
-            <p>Status</p>
-          </div>
-
           {cloudcasts.length === 0 ? (
             <div className="flex items-center gap-2 px-4 py-6 text-sm text-slate-500">
               <Icon path={icons.alert} className="h-4 w-4" />
               No tunnels yet. Create one below.
             </div>
           ) : (
-            cloudcasts.map((cloudcast) => (
-              <div key={cloudcast.id} className="grid gap-2 border-t border-sky-100 px-4 py-3 text-sm md:grid-cols-[2fr_2fr_1fr] md:items-center md:gap-3">
-                <p className="inline-flex items-center gap-2 font-medium text-slate-900">
-                  <Icon path={icons.external} className="h-4 w-4 text-sky-600" />
-                  {cloudcast.publicUrl}
-                </p>
-                <p className="inline-flex items-center gap-2 text-slate-600">
-                  <Icon path={icons.route} className="h-4 w-4 text-sky-500" />
-                  {cloudcast.targetUrl}
-                </p>
-                <p>
-                  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold ${
-                    cloudcast.status === 'online' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                  }`}>
-                    <Icon path={cloudcast.status === 'online' ? icons.check : icons.alert} className="h-3 w-3" />
-                    {cloudcast.status}
-                  </span>
-                </p>
-              </div>
-            ))
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[640px] border-collapse text-left text-sm">
+                <caption className="sr-only">List of active CloudCast tunnels and their connection status.</caption>
+                <thead className="bg-sky-50 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  <tr>
+                    <th scope="col" className="px-4 py-2">Public URL</th>
+                    <th scope="col" className="px-4 py-2">Target</th>
+                    <th scope="col" className="px-4 py-2">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cloudcasts.map((cloudcast) => (
+                    <tr key={cloudcast.id} className="border-t border-sky-100">
+                      <td className="px-4 py-3 font-medium text-slate-900">
+                        <span className="inline-flex items-center gap-2">
+                          <Icon path={icons.external} className="h-4 w-4 text-sky-600" />
+                          {cloudcast.publicUrl}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">
+                        <span className="inline-flex items-center gap-2">
+                          <Icon path={icons.route} className="h-4 w-4 text-sky-500" />
+                          {cloudcast.targetUrl}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold ${
+                          cloudcast.status === 'online' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                        }`}>
+                          <Icon path={cloudcast.status === 'online' ? icons.check : icons.alert} className="h-3 w-3" />
+                          {cloudcast.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </section>
@@ -474,7 +507,7 @@ function DashboardPage({ user }) {
 
           <div className="md:col-span-3">
             <FormInput
-              label="Subdomain"
+              label="Subdomain (optional)"
               icon={icons.route}
               type="text"
               value={form.subdomain}
