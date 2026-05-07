@@ -11,7 +11,7 @@ const createToken = require('../utils/tokens/createToken');
 const REQUEST_TIMEOUT_MS = 30000;
 const BASE_DOMAIN = process.env.BASE_DOMAIN || 'cloudcast.dev';
 const CACHE_DIR = process.env.CLOUDCAST_CACHE_DIR || path.join(process.cwd(), '.cloudcast-cache');
-const CACHE_VARY_HEADERS = ['accept', 'accept-language', 'accept-encoding'];
+const CACHE_KEY_HEADERS = ['accept', 'accept-language', 'accept-encoding'];
 
 function normalizeHeaders(rawHeaders) {
     const normalized = {};
@@ -127,7 +127,7 @@ function isCacheableResponse(status, headers, cacheSeconds) {
 
 function createCacheKey({ method, url, headers }) {
     const varyHeaders = {};
-    CACHE_VARY_HEADERS.forEach((header) => {
+    CACHE_KEY_HEADERS.forEach((header) => {
         if (headers[header]) {
             varyHeaders[header] = headers[header];
         }
@@ -299,7 +299,8 @@ function createTunnelServer(server) {
         const requestHeaders = normalizeHeaders(req.headers);
         const requestMethod = req.method || 'GET';
         const host = req.headers.host || 'localhost';
-        const requestUrl = `${req.protocol}://${host}${req.originalUrl}`;
+        const protocol = req.protocol || 'http';
+        const requestUrl = `${protocol}://${host}${req.originalUrl}`;
         const cacheAllowed = isCacheableRequest(requestMethod, requestHeaders);
         const cacheKey = cacheAllowed ? createCacheKey({ method: requestMethod, url: requestUrl, headers: requestHeaders }) : null;
         if (cacheAllowed && cacheKey) {

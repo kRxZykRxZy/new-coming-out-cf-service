@@ -1,7 +1,7 @@
 import { loadConfig } from '../lib/config.ts';
 import { apiRequest } from '../lib/api.ts';
 import { fromBase64, toBase64 } from '../lib/encoding.ts';
-import { normalizeHeaders } from '../lib/headers.ts';
+import { normalizeHeaders, stripHopByHopHeaders } from '../lib/headers.ts';
 
 export async function startTunnel(cloudcastId?: string) {
   const config = await loadConfig();
@@ -45,14 +45,15 @@ export async function startTunnel(cloudcastId?: string) {
         throw new Error('Unsupported target protocol.');
       }
       const requestPath = typeof message.path === 'string' ? message.path : '/';
-      if (!requestPath.startsWith('/')) {
+      if (!requestPath.startsWith('/') || requestPath.startsWith('//')) {
         throw new Error('Invalid request path.');
       }
       const target = new URL(requestPath, baseTarget);
+      if (target.origin !== baseTarget.origin) {
+        throw new Error('Invalid request path.');
+      }
       const bodyBytes = message.body ? fromBase64(message.body) : undefined;
-      const headers = normalizeHeaders(message.headers ?? {});
-      delete headers.host;
-      delete headers['content-length'];
+      const headers = stripHopByHopHeaders(normalizeHeaders(message.headers ?? {}));
       const requestMethod = typeof message.method === 'string' ? message.method : 'GET';
       const response = await fetch(target.toString(), {
         method: requestMethod,

@@ -14,3 +14,10 @@ export function normalizeHeaders(
   });
   return normalized;
 }
+
+export function stripHopByHopHeaders(headers: Record<string, string>): Record<string, string> {
+  const sanitized = { ...headers };
+  delete sanitized.host;
+  delete sanitized['content-length'];
+  return sanitized;
+}
