@@ -48,20 +48,15 @@ export async function startTunnel(cloudcastId?: string) {
       if (!requestPath.startsWith('/') || requestPath.startsWith('//')) {
         throw new Error('Invalid request path.');
       }
+      const rawPath = requestPath.split('?')[0];
+      if (rawPath.split('/').some((segment) => segment === '..')) {
+        throw new Error('Invalid request path.');
+      }
       const relativeUrl = new URL(requestPath, 'http://cloudcast.local');
-      if (relativeUrl.origin !== 'http://cloudcast.local') {
-        throw new Error('Invalid request path.');
-      }
-      if (relativeUrl.pathname.split('/').some((segment) => segment === '..')) {
-        throw new Error('Invalid request path.');
-      }
       const target = new URL(baseTarget);
       target.pathname = relativeUrl.pathname;
       target.search = relativeUrl.search;
       target.hash = relativeUrl.hash;
-      if (target.origin !== baseTarget.origin) {
-        throw new Error('Invalid request path.');
-      }
       const bodyBytes = message.body ? fromBase64(message.body) : undefined;
       const headers = stripHopByHopHeaders(normalizeHeaders(message.headers ?? {}));
       const requestMethod = typeof message.method === 'string' ? message.method : 'GET';
